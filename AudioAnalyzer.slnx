@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="AudioAnalyzer/AudioAnalyzer.vcxproj" Id="e32774ab-b210-4a56-af73-0ed5a1813fd5" />
+</Solution>
