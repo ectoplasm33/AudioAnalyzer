@@ -88,7 +88,7 @@ void render_frame(float* audio_buffer, int buffer_size) {
     for (int x = 0; x < win_x; x++) {
         int idx = x * step;
         int y = (int)((audio_buffer[idx] * 0.5f + 0.5f) * win_y);
-        SetPixel(hdc, x, win_y - y, (255 << 16) | (0 << 8) | 0);
+        SetPixel(hdc, x, win_y - y, (255 << 16) | (90 << 8) | 60);
     }
 }
 

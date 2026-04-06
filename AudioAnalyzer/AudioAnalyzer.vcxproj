@@ -135,15 +135,15 @@ avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="audio.cpp" />
+    <ClCompile Include="audio\audio.cpp" />
+    <ClCompile Include="fft\fft.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="fft.cpp" />
-    <ClCompile Include="window.cpp" />
+    <ClCompile Include="window\window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="audio.hpp" />
-    <ClInclude Include="fft.hpp" />
-    <ClInclude Include="window.hpp" />
+    <ClInclude Include="audio\audio.hpp" />
+    <ClInclude Include="fft\fft.hpp" />
+    <ClInclude Include="window\window.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

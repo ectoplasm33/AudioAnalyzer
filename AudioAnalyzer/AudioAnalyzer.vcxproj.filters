@@ -18,24 +18,24 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="audio.cpp">
+    <ClCompile Include="audio\audio.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="fft.cpp">
+    <ClCompile Include="fft\fft.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="winAPI.cpp">
+    <ClCompile Include="window\window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="audio.hpp">
+    <ClInclude Include="audio\audio.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="fft.hpp">
+    <ClInclude Include="fft\fft.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="winAPI.hpp">
+    <ClInclude Include="window\window.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

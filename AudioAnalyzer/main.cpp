@@ -1,10 +1,12 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <mutex>
+#include <atomic>
 
-#include "audio.hpp"
-#include "fft.hpp"
-#include "window.hpp"
+#include "audio/audio.hpp"
+#include "fft/fft.hpp"
+#include "window/window.hpp"
 
 static constexpr int pow(const int base, const int power) {
     if (power == 0) return 1;
@@ -18,13 +20,39 @@ static constexpr int pow(const int base, const int power) {
     return result;
 }
 
+constexpr int audio_buffer_size = pow(2, 13);
+constexpr int sample_size = pow(2, 11);
+
+float audio_buffer[audio_buffer_size]{};
+int buffer_index = 0;
+
+std::mutex mtx;
+std::atomic<bool> active(true);
+
+static void audio_thread_func() {
+    while (active) {
+        float samples[sample_size];
+
+        int samples_retrived = fetch_audio_samples(samples, sample_size);
+
+        //std::cout << samples_retrived << '\n';
+
+        if (samples_retrived > 0) {
+            std::lock_guard<std::mutex> lock(mtx);
+
+            for (int i = 0; i < samples_retrived; i++) {
+                audio_buffer[(buffer_index + i) & (audio_buffer_size - 1)] = samples[i];
+            }
+
+            buffer_index = (buffer_index + samples_retrived) & (audio_buffer_size - 1);
+
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+}
+
 int main() {
-    constexpr int audio_buffer_size = pow(2, 16);
-    constexpr int sample_size = pow(2, 11);
-
-    float audio_buffer[audio_buffer_size]{};
-    int buffer_index = 0;
-
     bool init_result = init_audio();
 
     if (!init_result) {
@@ -43,30 +71,27 @@ int main() {
         return 0x2;
     }
 
-    bool active = true;
+    std::thread audio_thread(audio_thread_func);
+    
     while (active) {
         if (!update_window()) {
+            active = false;
             break;
         }
 
-        float samples[sample_size];
+        float local_buffer[audio_buffer_size];
 
-        int samples_retrived = fetch_audio_samples(samples, sample_size);
-
-        std::cout << samples_retrived << '\n';
-
-        if (samples_retrived > 0) {
-            for (int i = 0; i < samples_retrived; i++) {
-                audio_buffer[(buffer_index + i) & (audio_buffer_size - 1)] = samples[i];
-            }
-
-            buffer_index = (buffer_index + samples_retrived) & (audio_buffer_size - 1);
-        } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            std::copy(std::begin(audio_buffer), std::end(audio_buffer), local_buffer);
         }
 
-        render_frame(audio_buffer, audio_buffer_size);
+        render_frame(local_buffer, audio_buffer_size);
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(10)); 
     }
+
+    audio_thread.join();
 
     cleanup_window();
     cleanup_audio();
