@@ -20,7 +20,7 @@ static constexpr int pow(const int base, const int power) {
     return result;
 }
 
-constexpr int audio_buffer_size = pow(2, 13);
+constexpr int audio_buffer_size = pow(2, 12);
 constexpr int sample_size = pow(2, 11);
 
 float audio_buffer[audio_buffer_size]{};
@@ -53,18 +53,20 @@ static void audio_thread_func() {
 }
 
 int main() {
-    bool init_result = init_audio();
+    int init_audio_result = init_audio();
 
-    if (!init_result) {
+    if ((init_audio_result & 0xf) != 0) {
         cleanup_audio();
-        std::cerr << "Audio initialization failed.";
+        std::cerr << "Audio initialization failed with code: " << init_audio_result;
         return 0x1;
     }
 
-    constexpr int width = 1500; constexpr int height = width * 9 / 16;
-    init_result = init_window(width, height);
+	std::cout << "Audio data format: " << ((init_audio_result >> 6) == 1 ? "PCM16" : ((init_audio_result >> 6) == 2 ? "IEEE float" : "PCM24")) << "\nAudio channel format: " << (((init_audio_result >> 4) & 0b11) == 1 ? "Mono" : "Stereo") << '\n';
 
-    if (!init_result) {
+    constexpr int width = 1500; constexpr int height = width * 9 / 16;
+    bool init_window_result = init_window(width, height);
+
+    if (!init_window_result) {
         cleanup_window();
         cleanup_audio();
         std::cerr << "Window initialization failed.";

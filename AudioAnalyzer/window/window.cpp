@@ -87,7 +87,7 @@ void render_frame(float* audio_buffer, int buffer_size) {
     int step = std::max<int>(buffer_size / win_x, 1);
     for (int x = 0; x < win_x; x++) {
         int idx = x * step;
-        int y = (int)((audio_buffer[idx] * 0.5f + 0.5f) * win_y);
+        int y = (int)((audio_buffer[idx] + 0.5f) * win_y);
         SetPixel(hdc, x, win_y - y, (255 << 16) | (90 << 8) | 60);
     }
 }
