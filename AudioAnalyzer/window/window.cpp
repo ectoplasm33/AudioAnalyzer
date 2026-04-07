@@ -3,10 +3,12 @@
 
 #include "window.hpp"
 
+// window objects
 static HWND hwnd = nullptr;
 static HDC hdc = nullptr;
 static HINSTANCE h_instance;
 
+// back buffer objects
 static HDC memDC;
 static HBITMAP back_buffer;
 
@@ -14,7 +16,10 @@ static RECT memDC_rect;
 
 static HBITMAP last_buffer;
 
+
 HBRUSH black_brush = CreateSolidBrush(RGB(0, 0, 0));
+HPEN green_pen = CreatePen(PS_SOLID, 1, RGB(85, 255, 40));
+HPEN blue_pen = CreatePen(PS_SOLID, 1, RGB(40, 80, 255));
 
 static int win_x;
 static int win_y;
@@ -104,12 +109,28 @@ void render_frame(const float* fft_buffer, const float* audio_buffer, const int 
     // clear back buffer
     FillRect(memDC, &memDC_rect, black_brush);
 
+    int audio_x = 0;
+    int audio_y = win_y - (audio_buffer[0] + 0.75f) * win_y;
+
+    MoveToEx(memDC, 0, win_y - (int)((fft_buffer[0] + 0.05f) * win_y), nullptr);
+
     int end = std::min<int>(win_x, buffer_size);
     for (int x = 0; x < end; x++) {
-        int f_y = (int)((audio_buffer[x] + 0.05f) * win_y);
-        int a_y = (int)((fft_buffer[x] + 0.75f) * win_y);
-        if (x < buffer_size >> 1) SetPixel(memDC, x, win_y - f_y, (255 << 16) | (90 << 8) | 60);
-        SetPixel(memDC, x, win_y - a_y, (85 << 16) | (255 << 8) | 40);
+        int f_y = (int)((1.0f - audio_buffer[x]) * (float)win_y) - 10;
+        int a_y = (int)((1.0f - (fft_buffer[x] + 0.75f)) * (float)win_y);
+        if (x < buffer_size >> 1) {
+            SelectObject(memDC, blue_pen);
+            MoveToEx(memDC, x, win_y-10, nullptr);
+            LineTo(memDC, x, f_y);
+           
+            //SetPixel(memDC, x, win_y - f_y, (255 << 16) | (90 << 8) | 60);
+        }
+        SelectObject(memDC, green_pen);
+        MoveToEx(memDC, audio_x, audio_y, nullptr);
+        LineTo(memDC, x, a_y);
+        
+        audio_x = x;
+        audio_y = a_y;
     }
 
     BitBlt(hdc, 0, 0, win_x, win_y, memDC, 0, 0, SRCCOPY);
@@ -117,6 +138,8 @@ void render_frame(const float* fft_buffer, const float* audio_buffer, const int 
 
 void cleanup_window() {
     DeleteObject(black_brush);
+    DeleteObject(green_pen);
+    DeleteObject(blue_pen);
 
     SelectObject(memDC, last_buffer);
     DeleteObject(back_buffer);
