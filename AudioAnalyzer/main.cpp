@@ -8,26 +8,16 @@
 #include "fft/fft.hpp"
 #include "window/window.hpp"
 
-static constexpr int pow(const int base, const int power) {
-    if (power == 0) return 1;
-
-    int result = base;
-
-    for (int i = 0; i < power - 1; i++) {
-        result *= base;
-    }
-
-    return result;
-}
-
-constexpr int audio_buffer_size = pow(2, 12);
-constexpr int sample_size = pow(2, 11);
+constexpr int buffer_size_bits = 12;
+constexpr int audio_buffer_size = 1 << buffer_size_bits;
+constexpr int sample_size = 1 << 11;
 
 float audio_buffer[audio_buffer_size]{};
 int buffer_index = 0;
 
 std::mutex mtx;
 std::atomic<bool> active(true);
+std::atomic<bool> new_data(false);
 
 static void audio_thread_func() {
     while (active) {
@@ -45,6 +35,8 @@ static void audio_thread_func() {
             }
 
             buffer_index = (buffer_index + samples_retrived) & (audio_buffer_size - 1);
+
+            new_data = true;
 
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -73,7 +65,20 @@ int main() {
         return 0x2;
     }
 
+    init_fft(buffer_size_bits);
+
     std::thread audio_thread(audio_thread_func);
+
+    float local_buffer[audio_buffer_size];
+
+    float fft_output[audio_buffer_size];
+
+    constexpr float scale = 6.28318530718f / (float)(audio_buffer_size - 1);
+
+    float hann_coefficients[audio_buffer_size];
+    for (int i = 0; i < audio_buffer_size; i++) {
+        hann_coefficients[i] = 0.5f * (1.0f - std::cosf((float)i * scale));
+    }
     
     while (active) {
         if (!update_window()) {
@@ -81,19 +86,49 @@ int main() {
             break;
         }
 
-        float local_buffer[audio_buffer_size];
+        if (new_data) {
+            float hann[audio_buffer_size];
 
-        {
-            std::lock_guard<std::mutex> lock(mtx);
-            std::copy(std::begin(audio_buffer), std::end(audio_buffer), local_buffer);
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+
+                int start = (buffer_index - audio_buffer_size) & (audio_buffer_size - 1);
+
+                std::copy_n(std::begin(audio_buffer) + buffer_index, audio_buffer_size - buffer_index, std::begin(local_buffer));
+                std::copy_n(std::begin(audio_buffer), buffer_index, std::begin(local_buffer) + (audio_buffer_size - buffer_index));
+
+                //for (int i = 0; i < audio_buffer_size; i++) {
+                //    local_buffer[i] = 0.05f * std::sinf((float)i * .2f) + 0.1f * std::sinf((float)i * .03f);
+                //}
+                
+                float mean = 0.0f;
+                for (int i = 0; i < audio_buffer_size; i++) {
+                    mean += local_buffer[i];
+                }
+                mean /= (float)audio_buffer_size;
+
+                for (int i = 0; i < audio_buffer_size; i++) {
+                    local_buffer[i] -= mean;
+                }
+
+                for (int i = 0; i < audio_buffer_size; i++) {
+                    hann[i] = local_buffer[i] * hann_coefficients[i];
+                }
+
+                new_data = false;
+            }
+
+            fast_fourier_transform(hann, fft_output, audio_buffer_size);
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
-        render_frame(local_buffer, audio_buffer_size);
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(10)); 
+        render_frame(local_buffer, fft_output, audio_buffer_size);
     }
 
     audio_thread.join();
+
+    fft_cleanup();
 
     cleanup_window();
     cleanup_audio();

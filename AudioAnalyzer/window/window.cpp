@@ -5,8 +5,14 @@
 
 static HWND hwnd = nullptr;
 static HDC hdc = nullptr;
-static HBITMAP backbuffer = nullptr;
 static HINSTANCE h_instance;
+
+static HDC memDC;
+static HBITMAP back_buffer;
+
+static RECT memDC_rect;
+
+static HBITMAP last_buffer;
 
 HBRUSH black_brush = CreateSolidBrush(RGB(0, 0, 0));
 
@@ -22,6 +28,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     case WM_SIZE:
         win_x = LOWORD(lParam);  // width
         win_y = HIWORD(lParam); // height
+
+
+
+        SelectObject(memDC, last_buffer);
+        DeleteObject(back_buffer);
+        back_buffer = CreateCompatibleBitmap(hdc, win_x, win_y);
+
+        last_buffer = (HBITMAP)SelectObject(memDC, back_buffer);
+
+        memDC_rect = {0, 0, win_x, win_y};
+
         return 0;
 
     default:
@@ -29,7 +46,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     }
 }
 
-bool init_window(int width, int height) {
+bool init_window(const int width, const int height) {
     h_instance = GetModuleHandleW(nullptr);
 
     WNDCLASS wc = {};
@@ -60,6 +77,13 @@ bool init_window(int width, int height) {
 
     hdc = GetDC(hwnd);
 
+    memDC = CreateCompatibleDC(hdc);
+    back_buffer = CreateCompatibleBitmap(hdc, win_x, win_y);
+    
+    last_buffer = (HBITMAP)SelectObject(memDC, back_buffer); // memDC draws to back_buffer
+
+    memDC_rect = {0, 0, win_x, win_y};
+
     return true;
 }
 
@@ -76,24 +100,27 @@ bool update_window() {
     return true;
 }
 
-void render_frame(float* audio_buffer, int buffer_size) {
-    RECT rect;
-    GetClientRect(hwnd, &rect);
+void render_frame(const float* fft_buffer, const float* audio_buffer, const int buffer_size) {
+    // clear back buffer
+    FillRect(memDC, &memDC_rect, black_brush);
 
-    // clear screen
-    FillRect(hdc, &rect, black_brush);
-
-    // simple waveform visualization
-    int step = std::max<int>(buffer_size / win_x, 1);
-    for (int x = 0; x < win_x; x++) {
-        int idx = x * step;
-        int y = (int)((audio_buffer[idx] + 0.5f) * win_y);
-        SetPixel(hdc, x, win_y - y, (255 << 16) | (90 << 8) | 60);
+    int end = std::min<int>(win_x, buffer_size);
+    for (int x = 0; x < end; x++) {
+        int f_y = (int)((audio_buffer[x] + 0.05f) * win_y);
+        int a_y = (int)((fft_buffer[x] + 0.75f) * win_y);
+        if (x < buffer_size >> 1) SetPixel(memDC, x, win_y - f_y, (255 << 16) | (90 << 8) | 60);
+        SetPixel(memDC, x, win_y - a_y, (85 << 16) | (255 << 8) | 40);
     }
+
+    BitBlt(hdc, 0, 0, win_x, win_y, memDC, 0, 0, SRCCOPY);
 }
 
 void cleanup_window() {
     DeleteObject(black_brush);
+
+    SelectObject(memDC, last_buffer);
+    DeleteObject(back_buffer);
+    DeleteDC(memDC);
 
     if (hdc && hwnd) ReleaseDC(hwnd, hdc);
     hwnd = nullptr;
