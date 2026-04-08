@@ -110,7 +110,7 @@ void render_frame(const float* fft_buffer, const float* audio_buffer, const int 
     FillRect(memDC, &memDC_rect, black_brush);
 
     int audio_x = 0;
-    int audio_y = win_y - (audio_buffer[0] + 0.75f) * win_y;
+    int audio_y = (int)((1.0f - (fft_buffer[0] + 0.75f)) * (float)win_y);
 
     MoveToEx(memDC, 0, win_y - (int)((fft_buffer[0] + 0.05f) * win_y), nullptr);
 
@@ -120,10 +120,8 @@ void render_frame(const float* fft_buffer, const float* audio_buffer, const int 
         int a_y = (int)((1.0f - (fft_buffer[x] + 0.75f)) * (float)win_y);
         if (x < buffer_size >> 1) {
             SelectObject(memDC, blue_pen);
-            MoveToEx(memDC, x, win_y-10, nullptr);
-            LineTo(memDC, x, f_y);
-           
-            //SetPixel(memDC, x, win_y - f_y, (255 << 16) | (90 << 8) | 60);
+            MoveToEx(memDC, x+5, win_y-10, nullptr);
+            LineTo(memDC, x+5, f_y);
         }
         SelectObject(memDC, green_pen);
         MoveToEx(memDC, audio_x, audio_y, nullptr);

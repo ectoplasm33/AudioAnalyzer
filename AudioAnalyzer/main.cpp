@@ -97,20 +97,6 @@ int main() {
                 std::copy_n(std::begin(audio_buffer) + buffer_index, audio_buffer_size - buffer_index, std::begin(local_buffer));
                 std::copy_n(std::begin(audio_buffer), buffer_index, std::begin(local_buffer) + (audio_buffer_size - buffer_index));
 
-                //for (int i = 0; i < audio_buffer_size; i++) {
-                //    local_buffer[i] = 0.05f * std::sinf((float)i * .2f) + 0.1f * std::sinf((float)i * .03f);
-                //}
-                
-                float mean = 0.0f;
-                for (int i = 0; i < audio_buffer_size; i++) {
-                    mean += local_buffer[i];
-                }
-                mean /= (float)audio_buffer_size;
-
-                for (int i = 0; i < audio_buffer_size; i++) {
-                    local_buffer[i] -= mean;
-                }
-
                 for (int i = 0; i < audio_buffer_size; i++) {
                     hann[i] = local_buffer[i] * hann_coefficients[i];
                 }

@@ -1,17 +1,18 @@
 #include <iostream>
 
-static struct complex {
-	float real, imag;
-};
-
 static int* reversed_indexes;
-static complex* twiddle_factors;
+static float* real;
+static float* imag;
+static float** cos_angles; 
+static float** sin_angles;
+static int buffer_size_bits;
 
 void init_fft(const int num_bits) {
 	int size = 1 << num_bits;
 
 	reversed_indexes = new int[size];
-	twiddle_factors = new complex[size];
+	real = (float*)_aligned_malloc(size * sizeof(float), 32);
+	imag = (float*)_aligned_malloc(size * sizeof(float), 32);
 	
 	for (int i = 0; i < size; i++) {
 		int n = i;
@@ -23,51 +24,93 @@ void init_fft(const int num_bits) {
 		}
 
 		reversed_indexes[i] = r;
-		twiddle_factors[i] = {0.0f, 0.0f};
 	}
+
+	cos_angles = new float*[num_bits];
+	sin_angles = new float*[num_bits];
+
+	for (int i = 0; i < num_bits; i++) {
+		int half = 1 << i;
+
+		float arc = -6.28318530718f / (float)(half << 1);
+
+		cos_angles[i] = new float[half];
+		sin_angles[i] = new float[half];
+
+		for (int j = 0; j < half; j++) {
+			float angle = arc * (float)j;
+
+			cos_angles[i][j] = std::cosf(angle);
+			sin_angles[i][j] = std::sinf(angle);
+		}
+	}
+
+	buffer_size_bits = num_bits;
 }
 
 void fast_fourier_transform(const float* samples, float* out, const int size) {
 	for (int i = 0; i < size; i++) {
-		twiddle_factors[i] = {samples[reversed_indexes[i]], 0.0f};
+		real[i] = samples[reversed_indexes[i]];
 	}
 
-	for (int group_size = 2; group_size <= size; group_size <<= 1) {
-		float arc = -6.28318530718f / (float)group_size;
-		int half = group_size >> 1;
+	__m256 zero_vec = _mm256_setzero_ps();
+
+	int i = 0;
+	while (i < size) {
+		_mm256_stream_ps(&imag[i], zero_vec);
+
+		i += 8;
+	}
+
+	float scale = 300.0f / (float)size;
+	
+	for (int stage = 0; stage < buffer_size_bits; stage++) {
+		int group_size = 2 << stage;
+		int half = 1 << stage;
 
 		for (int i = 0; i < size; i += group_size) {
+			float* cos = cos_angles[stage];
+			float* sin = sin_angles[stage];
+
 			for (int j = 0; j < half; j++) {
 				int a = i + j;
 				int b = a + half;
 
-				float angle = (float)j * arc;
+				float b_real = real[b];
+				float b_imag = imag[b];
 
-				float cos = std::cosf(angle);
-				float sin = std::sinf(angle);
+				float c = cos[j];
+				float s = sin[j];
 
-				float tr = twiddle_factors[b].real * cos - twiddle_factors[b].imag * sin;
-				float ti = twiddle_factors[b].imag * cos + twiddle_factors[b].real * sin;
+				float tr = b_real * c - b_imag * s;
+				float ti = b_imag * c + b_real * s;
 
-				complex temp_a = twiddle_factors[a];
-
-				twiddle_factors[a].real += tr;
-				twiddle_factors[a].imag += ti;
-				twiddle_factors[b].real = temp_a.real - tr;
-				twiddle_factors[b].imag = temp_a.imag - ti;
+				real[b] = real[a] - tr;
+				imag[b] = imag[a] - ti;
+				real[a] += tr;
+				imag[a] += ti;
 			}
 		}
 	}
 
 	for (int i = 0; i < size; i++) {
-		float real = twiddle_factors[i].real;
-		float imag = twiddle_factors[i].imag;
+		float a = real[i];
+		float b = imag[i];
 
-		out[i] = std::logf(std::sqrtf(real * real + imag * imag)*.02f + 1.0f);
+		out[i] = std::logf(std::logf(std::sqrtf(a * a + b * b)*scale + 1.0f) + 1.0f);
 	}
 }
 
 void fft_cleanup() {
 	delete[] reversed_indexes;
-	delete[] twiddle_factors;
+	_aligned_free(real);
+	_aligned_free(imag);
+
+	for (int i = 0; i < buffer_size_bits; i++) {
+		delete[] cos_angles[i];
+		delete[] sin_angles[i];
+	}
+
+	delete[] cos_angles;
+	delete[] sin_angles;
 }
