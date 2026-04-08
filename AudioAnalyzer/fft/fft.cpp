@@ -68,10 +68,10 @@ void fast_fourier_transform(const float* samples, float* out, const int size) {
 		int group_size = 2 << stage;
 		int half = 1 << stage;
 
-		for (int i = 0; i < size; i += group_size) {
-			float* cos = cos_angles[stage];
-			float* sin = sin_angles[stage];
+		float* cos = cos_angles[stage];
+		float* sin = sin_angles[stage];
 
+		for (int i = 0; i < size; i += group_size) {
 			for (int j = 0; j < half; j++) {
 				int a = i + j;
 				int b = a + half;
