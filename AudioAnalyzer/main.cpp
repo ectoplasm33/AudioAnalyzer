@@ -105,11 +105,11 @@ int main() {
             }
 
             fast_fourier_transform(hann, fft_output, audio_buffer_size);
-        } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
 
-        render_frame(local_buffer, fft_output, audio_buffer_size);
+            render_frame(local_buffer, fft_output, audio_buffer_size);
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
     }
 
     audio_thread.join();

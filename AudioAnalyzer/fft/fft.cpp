@@ -57,14 +57,33 @@ void fast_fourier_transform(const float* samples, float* out, const int size) {
 
 	int i = 0;
 	while (i < size) {
-		_mm256_stream_ps(&imag[i], zero_vec);
+		_mm256_store_ps(&imag[i], zero_vec);
 
 		i += 8;
 	}
 
-	float scale = 300.0f / (float)size;
+	__m256 neg_one_vec = _mm256_set1_ps(-1.0f);
+
+	// first stage
+	for (int i = 0; i < size; i += 8) {
+		__m256 r_even = _mm256_load_ps(real + i);
+		__m256 r_odd = _mm256_mul_ps(_mm256_movehdup_ps(r_even), neg_one_vec);
+		r_even = _mm256_moveldup_ps(r_even);
+
+		__m256 re = _mm256_addsub_ps(r_even, r_odd);
+
+		_mm256_store_ps(real + i, re);
+
+		r_even = _mm256_load_ps(imag + i);
+		r_odd = _mm256_mul_ps(_mm256_movehdup_ps(r_even), neg_one_vec);
+		r_even = _mm256_moveldup_ps(r_even);
+
+		__m256 im = _mm256_addsub_ps(r_even, r_odd);
+
+		_mm256_store_ps(imag + i, im);
+	}
 	
-	for (int stage = 0; stage < buffer_size_bits; stage++) {
+	for (int stage = 1; stage < 3; stage++) {
 		int group_size = 2 << stage;
 		int half = 1 << stage;
 
@@ -93,11 +112,52 @@ void fast_fourier_transform(const float* samples, float* out, const int size) {
 		}
 	}
 
-	for (int i = 0; i < size; i++) {
-		float a = real[i];
-		float b = imag[i];
+	for (int stage = 3; stage < buffer_size_bits; stage += 1) {
+		int group_size = 2 << stage;
+		int half = 1 << stage;
 
-		out[i] = std::logf(std::logf(std::sqrtf(a * a + b * b)*scale + 1.0f) + 1.0f);
+		float* cos = cos_angles[stage];
+		float* sin = sin_angles[stage];
+
+		for (int i = 0; i < size; i += group_size) {
+			for (int j = 0; j < half; j += 8) {
+				float* real_ptr = real + i + j;
+				float* imag_ptr = imag + i + j;
+
+				__m256 ra = _mm256_load_ps(real_ptr);
+				__m256 rb = _mm256_load_ps(real_ptr + half);
+
+				__m256 ia = _mm256_load_ps(imag_ptr);
+				__m256 ib = _mm256_load_ps(imag_ptr + half);
+
+				__m256 c = _mm256_load_ps(cos + j);
+				__m256 s = _mm256_load_ps(sin + j);
+
+				__m256 tr = _mm256_fmsub_ps(rb, c, _mm256_mul_ps(ib, s));
+				__m256 ti = _mm256_fmadd_ps(ib, c, _mm256_mul_ps(rb, s));
+
+				_mm256_store_ps(real_ptr, _mm256_add_ps(ra, tr));
+				_mm256_store_ps(imag_ptr, _mm256_add_ps(ia, ti));
+				_mm256_store_ps(real_ptr + half, _mm256_sub_ps(ra, tr));
+				_mm256_store_ps(imag_ptr + half, _mm256_sub_ps(ia, ti));
+			}
+		}
+	}
+
+	float scale = 75.0f / (float)size;
+
+	__m256 scale_avx = _mm256_set1_ps(scale);
+
+	for (int i = 0; i < size; i += 8) {
+		__m256 re = _mm256_load_ps(real + i);
+
+		__m256 im = _mm256_load_ps(imag + i);
+
+		__m256 sum = _mm256_fmadd_ps(im, im, _mm256_mul_ps(re, re));
+
+		__m256 mag = _mm256_sqrt_ps(sum);
+
+		_mm256_store_ps(out + i, _mm256_mul_ps(mag, scale_avx));
 	}
 }
 
