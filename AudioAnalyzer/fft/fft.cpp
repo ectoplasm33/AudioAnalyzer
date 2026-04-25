@@ -144,7 +144,7 @@ void fast_fourier_transform(const float* samples, float* out, const int size) {
 		}
 	}
 
-	float scale = 75.0f / (float)size;
+	float scale = 1.0f / (float)size;
 
 	__m256 scale_avx = _mm256_set1_ps(scale);
 
@@ -155,7 +155,7 @@ void fast_fourier_transform(const float* samples, float* out, const int size) {
 
 		__m256 sum = _mm256_fmadd_ps(im, im, _mm256_mul_ps(re, re));
 
-		__m256 mag = _mm256_sqrt_ps(sum);
+		__m256 mag = _mm256_mul_ps(_mm256_rsqrt_ps(sum), sum);
 
 		_mm256_store_ps(out + i, _mm256_mul_ps(mag, scale_avx));
 	}

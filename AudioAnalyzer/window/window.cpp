@@ -105,19 +105,19 @@ bool update_window() {
     return true;
 }
 
-void render_frame(const float* fft_buffer, const float* audio_buffer, const int buffer_size) {
+void render_frame(const float* audio_buffer, const float* fft_buffer, const int buffer_size) {
     // clear back buffer
     FillRect(memDC, &memDC_rect, black_brush);
 
     int audio_x = 0;
-    int audio_y = (int)((1.0f - (fft_buffer[0] + 0.75f)) * (float)win_y);
+    int audio_y = (int)((1.0f - (audio_buffer[0] + 0.75f)) * (float)win_y);
 
-    MoveToEx(memDC, 0, win_y - (int)((fft_buffer[0] + 0.05f) * win_y), nullptr);
+    MoveToEx(memDC, 0, win_y - 10, nullptr);
 
     int end = std::min<int>(win_x, buffer_size);
     for (int x = 0; x < end; x++) {
-        int f_y = (int)((1.0f - audio_buffer[x]) * (float)win_y) - 10;
-        int a_y = (int)((1.0f - (fft_buffer[x] + 0.75f)) * (float)win_y);
+        int f_y = (int)((1.0f - fft_buffer[x] * 25.0f) * (float)win_y) - 10;
+        int a_y = (int)((1.0f - (audio_buffer[x] + 0.75f)) * (float)win_y);
         if (x < buffer_size >> 1) {
             SelectObject(memDC, blue_pen);
             MoveToEx(memDC, x+5, win_y-10, nullptr);

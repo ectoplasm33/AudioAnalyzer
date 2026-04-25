@@ -13,6 +13,7 @@ static IAudioClient* audio_client = nullptr;
 static IAudioCaptureClient* capture_client = nullptr;
 static WAVEFORMATEX* wave_format = nullptr;
 static int audio_format;
+static int sample_rate;
 
 int init_audio() {
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -56,6 +57,7 @@ int init_audio() {
     if (FAILED(hr)) return 0x5;
 
 	int n_channels = wave_format->nChannels;
+    sample_rate = wave_format->nSamplesPerSec;
 
     if (n_channels > 2) {
         // unsupported channel count

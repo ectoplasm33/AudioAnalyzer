@@ -8,7 +8,7 @@
 #include "fft/fft.hpp"
 #include "window/window.hpp"
 
-constexpr int buffer_size_bits = 12;
+constexpr int buffer_size_bits = 11;
 constexpr int audio_buffer_size = 1 << buffer_size_bits;
 constexpr int sample_size = 1 << 11;
 
