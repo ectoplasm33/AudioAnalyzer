@@ -3,17 +3,20 @@
 #include <chrono>
 #include <mutex>
 #include <atomic>
+#include <vector>
 
 #include "audio/audio.hpp"
 #include "fft/fft.hpp"
 #include "window/window.hpp"
 
-constexpr int buffer_size_bits = 11;
+constexpr int buffer_size_bits = 12;
 constexpr int audio_buffer_size = 1 << buffer_size_bits;
 constexpr int sample_size = 1 << 11;
 
 float audio_buffer[audio_buffer_size]{};
 int buffer_index = 0;
+
+int sample_rate;
 
 std::mutex mtx;
 std::atomic<bool> active(true);
@@ -45,7 +48,7 @@ static void audio_thread_func() {
 }
 
 int main() {
-    int init_audio_result = init_audio();
+    int init_audio_result = init_audio(&sample_rate);
 
     if ((init_audio_result & 0xf) != 0) {
         cleanup_audio();
@@ -79,6 +82,8 @@ int main() {
     for (int i = 0; i < audio_buffer_size; i++) {
         hann_coefficients[i] = 0.5f * (1.0f - std::cosf((float)i * scale));
     }
+   
+    std::vector<float> peaks;
     
     while (active) {
         if (!update_window()) {
@@ -92,8 +97,6 @@ int main() {
             {
                 std::lock_guard<std::mutex> lock(mtx);
 
-                int start = (buffer_index - audio_buffer_size) & (audio_buffer_size - 1);
-
                 std::copy_n(std::begin(audio_buffer) + buffer_index, audio_buffer_size - buffer_index, std::begin(local_buffer));
                 std::copy_n(std::begin(audio_buffer), buffer_index, std::begin(local_buffer) + (audio_buffer_size - buffer_index));
 
@@ -105,6 +108,39 @@ int main() {
             }
 
             fast_fourier_transform(hann, fft_output, audio_buffer_size);
+
+            peaks.clear();
+
+            float km1 = fft_output[0];
+            float k = fft_output[1];
+            float kp1 = fft_output[2];
+
+            int end = audio_buffer_size >> 1;
+            for (int i = 3; i < end; i++) {
+                if (k > 0.002f && km1 < k && kp1 < k) {
+                    peaks.push_back(km1);
+                    peaks.push_back((float)(i - 3));
+
+                    peaks.push_back(k);
+                    peaks.push_back((float)(i - 2));
+
+                    peaks.push_back(kp1);
+                    peaks.push_back((float)(i - 1));
+                }
+
+                km1 = k;
+                k = kp1;
+                kp1 = fft_output[i];
+            }
+
+            for (int i = 0; i < peaks.size(); i += 6) {
+                float inv_total = 1.0f / (peaks[i] + peaks[i + 2] + peaks[i + 4]);
+
+                float freq = inv_total * (peaks[i] * peaks[i + 1] + peaks[i + 2] * peaks[i + 3] + peaks[i + 4] * peaks[i + 5]) * (float)sample_rate / (float)audio_buffer_size;
+
+                std::cout << freq << ' ';
+            }
+            std::cout << '\n';
 
             render_frame(local_buffer, fft_output, audio_buffer_size);
         } else {

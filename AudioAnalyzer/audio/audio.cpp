@@ -15,7 +15,7 @@ static WAVEFORMATEX* wave_format = nullptr;
 static int audio_format;
 static int sample_rate;
 
-int init_audio() {
+int init_audio(int* _sample_rate) {
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
     hr = CoCreateInstance(
@@ -58,6 +58,7 @@ int init_audio() {
 
 	int n_channels = wave_format->nChannels;
     sample_rate = wave_format->nSamplesPerSec;
+    *_sample_rate = sample_rate;
 
     if (n_channels > 2) {
         // unsupported channel count
