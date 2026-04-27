@@ -50,6 +50,9 @@ static void audio_thread_func() {
 int main() {
     int init_audio_result = init_audio(&sample_rate);
 
+    float fsample_rate = (float)sample_rate;
+    float inv_buffer_size = 1.0f / (float)audio_buffer_size;
+
     if ((init_audio_result & 0xf) != 0) {
         cleanup_audio();
         std::cerr << "Audio initialization failed with code: " << init_audio_result;
@@ -111,21 +114,24 @@ int main() {
 
             peaks.clear();
 
+            float max_amp = 0.0f;
+            int max_amp_idx;
+
             float km1 = fft_output[0];
             float k = fft_output[1];
             float kp1 = fft_output[2];
 
             int end = audio_buffer_size >> 1;
             for (int i = 3; i < end; i++) {
-                if (k > 0.002f && km1 < k && kp1 < k) {
-                    peaks.push_back(km1);
-                    peaks.push_back((float)(i - 3));
+                if (km1 < k && kp1 < k) {
+                    peaks.push_back(i - 2);
 
-                    peaks.push_back(k);
-                    peaks.push_back((float)(i - 2));
+                    if (k > max_amp) {
+                        max_amp = k;
+                        max_amp_idx = i - 2;
+                    }
 
-                    peaks.push_back(kp1);
-                    peaks.push_back((float)(i - 1));
+                    i++;
                 }
 
                 km1 = k;
@@ -133,14 +139,29 @@ int main() {
                 kp1 = fft_output[i];
             }
 
-            for (int i = 0; i < peaks.size(); i += 6) {
-                float inv_total = 1.0f / (peaks[i] + peaks[i + 2] + peaks[i + 4]);
+            float threshold = std::max(0.3333f * max_amp, 0.0001f);
 
-                float freq = inv_total * (peaks[i] * peaks[i + 1] + peaks[i + 2] * peaks[i + 3] + peaks[i + 4] * peaks[i + 5]) * (float)sample_rate / (float)audio_buffer_size;
+            int valid = 0;
+
+            for (int i : peaks) {
+                float k = fft_output[i];
+
+                if (k < threshold) continue;
+
+                valid++;
+
+                float km1 = fft_output[i - 1];
+                float kp1 = fft_output[i + 1];
+
+                float inv_total = 1.0f / (km1 + k + kp1);
+
+                float f = (float)i;
+
+                float freq = inv_total * (km1 * (f - 1.0f) + k * f + kp1 * (f + 1.0f)) * fsample_rate * inv_buffer_size;
 
                 std::cout << freq << ' ';
             }
-            std::cout << '\n';
+            if (valid > 0) std::cout << '\n';
 
             render_frame(local_buffer, fft_output, audio_buffer_size);
         } else {
