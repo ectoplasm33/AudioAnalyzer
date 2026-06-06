@@ -47,14 +47,14 @@ int init_audio(int* _sample_rate) {
         }
 
         hr = collection->Item(0, &device);
-        if (FAILED(hr)) return false;
+        if (FAILED(hr)) return 0x4;
     }
 
     hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, (void**)&audio_client);
-    if (FAILED(hr)) return 0x4;
+    if (FAILED(hr)) return 0x5;
 
     hr = audio_client->GetMixFormat(&wave_format); // get device format
-    if (FAILED(hr)) return 0x5;
+    if (FAILED(hr)) return 0x6;
 
 	int n_channels = wave_format->nChannels;
     sample_rate = wave_format->nSamplesPerSec;
@@ -64,7 +64,7 @@ int init_audio(int* _sample_rate) {
         // unsupported channel count
         CoTaskMemFree(wave_format);
         wave_format = nullptr;
-        return 0x6;
+        return 0x7;
 	}
 
     if (wave_format->wFormatTag == WAVE_FORMAT_PCM && wave_format->wBitsPerSample == 16) {
@@ -88,13 +88,13 @@ int init_audio(int* _sample_rate) {
             // unsupported format
             CoTaskMemFree(wave_format);
             wave_format = nullptr;
-            return 0x6;
+            return 0x7;
         }
     } else {
         // unsupported format
         CoTaskMemFree(wave_format);
         wave_format = nullptr;
-        return 0x6;
+        return 0x7;
 	}
 
 	audio_format = audio_format << 2 | n_channels;
@@ -108,14 +108,14 @@ int init_audio(int* _sample_rate) {
         wave_format,
         nullptr
     );
-    if (FAILED(hr)) return 0x7;
+    if (FAILED(hr)) return 0x8;
 
     hr = audio_client->GetService(__uuidof(IAudioCaptureClient), (void**)&capture_client);
-    if (FAILED(hr)) return 0x8;
+    if (FAILED(hr)) return 0x9;
 
     hr = audio_client->Start(); // start capturing
 
-	if (FAILED(hr)) return 0x9;
+	if (FAILED(hr)) return 0xa;
 
     return audio_format << 4;
 }
